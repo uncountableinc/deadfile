@@ -16,6 +16,9 @@ const excludedAssets = [
   // babel
   "babel.config.js",
 
+  // typescript
+  "tsconfig.json",
+
   // random
   ".html",
   ".md",

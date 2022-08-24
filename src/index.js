@@ -5,6 +5,7 @@ const _pickBy = require("lodash/pickBy");
 const path = require("path");
 const WriteReportFile = require("./cli/WriteReportFile");
 const ReportServer = require("./reportServer/server");
+const fs = require("fs");
 class DeadFile {
   constructor(argv) {
     const { _: entry, dir, exclude = [], output, report } = argv;
@@ -15,9 +16,29 @@ class DeadFile {
     this.shouldReport = !(report == false);
     this.allAssets = AllAssets(dir, { exclude }); // Array
     this.results = null;
+
+    let pathAliases = {};
+    try {
+      const tsconfigPath = path.join(this.baseDir, "tsconfig.json");
+      const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath));
+      const compilerOptions = tsconfig["compilerOptions"];
+      const baseUrl = compilerOptions["baseUrl"];
+      const paths = compilerOptions && compilerOptions["paths"];
+      if (paths) {
+        for (let [k, v] of Object.entries(paths)) {
+          pathAliases[k.replace("*", "")] = v.map((aliasTo) =>
+            path.join(this.baseDir, baseUrl, aliasTo.replace("*", ""))
+          );
+        }
+      }
+    } catch (err) {
+      // No tsconfig file found
+    }
+
     new UsedAssets(
       { entry: this.entry, dir: this.baseDir, exclude: this.exclude },
-      this.setUsedAssets.bind(this)
+      this.setUsedAssets.bind(this),
+      pathAliases
     ).start(); // Map
   }
 
@@ -26,7 +47,7 @@ class DeadFile {
   }
 
   entryToAbs(entry, baseDir) {
-    return entry.map(file => {
+    return entry.map((file) => {
       // Case 1: if entry is absolute use it
       if (path.isAbsolute(file)) return file;
       // Case 2: if entry is rel and baseDir is absolute, use baseDir as basis
@@ -58,12 +79,12 @@ class DeadFile {
     );
 
     const importedButNotFoundInScope = [...this.usedAssets]
-      .map(item => item[0])
-      .filter(file => !this.allAssets[file] && !/node_modules/.test(file));
+      .map((item) => item[0])
+      .filter((file) => !this.allAssets[file] && !/node_modules/.test(file));
 
     const importedNodeModules = [...this.usedAssets]
-      .map(item => item[0])
-      .filter(file => !this.allAssets[file] && /node_modules/.test(file));
+      .map((item) => item[0])
+      .filter((file) => !this.allAssets[file] && /node_modules/.test(file));
 
     const data = {
       allAssets: this.allAssets,
@@ -71,7 +92,7 @@ class DeadFile {
       importedButNotFound: [...this.notFound],
       unusedAssets,
       importedNodeModules,
-      importedButNotFoundInScope
+      importedButNotFoundInScope,
     };
 
     if (this.shouldReport) {

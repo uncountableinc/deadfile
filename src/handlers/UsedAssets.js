@@ -4,7 +4,7 @@ const { resolve } = require("./fileResolver");
 const isParsable = require("../ASTPlugins/isParsable");
 const {
   callExpressionHandler,
-  propertyHandler
+  propertyHandler,
 } = require("../ASTPlugins/isRequire");
 
 let { Parser, ParserWalk } = require("../ASTPlugins");
@@ -16,11 +16,11 @@ const {
   ImportExpression,
   ImportUsingExportKey,
   CallExpression,
-  Property
+  Property,
 } = require("../models/Types");
 
 class UsedAssets {
-  constructor(argv, onComplete) {
+  constructor(argv, onComplete, pathAliases) {
     this.entry = argv.entry; // array of entry files
     this.baseDir = argv.dir; // the entry path, used as a base route to search all files
     this.exclude = argv.exclude; // excluded path
@@ -31,8 +31,9 @@ class UsedAssets {
     this.taskQueue = new Set(); // the list of files which should be read
     this.visited = new Set(); // the list of visited files
     this.onComplete = onComplete; // method called when process is finished
+    this.pathAliases = pathAliases; // path aliases to resolve
 
-    this.entry.forEach(entry => this.updateSources(entry));
+    this.entry.forEach((entry) => this.updateSources(entry));
     this.spinner = ora("Counting imported assets");
   }
 
@@ -41,12 +42,23 @@ class UsedAssets {
     this.parseFile();
   }
 
+  resolveAliases(entry) {
+    for (let [k, v] of Object.entries(this.pathAliases)) {
+      if (entry.startsWith(k)) {
+        return entry.replace(k, v[0]);
+      }
+    }
+    return entry;
+  }
+
   /**
    * Find file, and parse it
    * @param {String} entry
    */
   parseFile(entry = this.entry[0]) {
-    fs.readFile(entry, "utf8", (err, file) => {
+    const fileName = this.resolveAliases(entry);
+
+    fs.readFile(fileName, "utf8", (err, file) => {
       if (err) {
         console.log("err: ", err.message);
         this.spinner.fail(err.message);
@@ -58,7 +70,7 @@ class UsedAssets {
       this.spinner.text = `${this.sources.size} imported assets found. ${entry} `;
 
       ParserWalk.full(parsed, this.checkImports.bind(this), {
-        ...ParserWalk.base
+        ...ParserWalk.base,
       });
 
       // after completing a file, remove the file from taskList, and check next file
@@ -96,6 +108,7 @@ class UsedAssets {
     // if relPath, does not have a value break
     if (!relPath) return;
     try {
+      relPath = this.resolveAliases(relPath);
       const { resolved, notFound } = resolve(relPath, this.currentFile) || {};
       // if not found, add it to not found assets
 
@@ -109,7 +122,7 @@ class UsedAssets {
 
       // if this file is excluded ignore it
       const isExcluded = this.exclude.some(
-        exc => exc && new RegExp(exc).test(resolved)
+        (exc) => exc && new RegExp(exc).test(resolved)
       );
       if (isExcluded) return;
 
