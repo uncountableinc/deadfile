@@ -29,6 +29,22 @@ const excludedAssets = [
   ".properties",
   ".xml",
   "browserlist",
+  ".py",
+  ".pyc",
+  ".json",
+  ".yaml",
+  ".txt",
+  ".cxl",
+  ".crt",
+  ".map",
+  ".part",
+  ".svg",
+  ".png",
+  ".woff",
+  ".ttf",
+
+  "materials/api",
+  "legacy_plastics",
 ];
 
 module.exports = {
