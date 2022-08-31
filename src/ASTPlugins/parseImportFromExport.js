@@ -57,7 +57,7 @@ function ParserExtension(Parser) {
   return class extends Parser {
     parseStatement(context, topLevel, exports) {
       // used to enable features such as dynamic import
-      this.options.ecmaVersion = 20;
+      this.options.ecmaVersion = 11;
 
       // check export from statements
       if (isImportUsingExport.call(this)) {
